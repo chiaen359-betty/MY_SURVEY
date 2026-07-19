@@ -15,7 +15,7 @@ except ImportError:
 # ==========================================
 ADMIN_PASSWORD = "betty"  # 後台密碼
 DATA_FILE = "survey_results.csv"  # 存檔檔名
-MAX_PEOPLE_LIMIT = 10  # 🎯 報名人數上限設定 (達到此人數即截止)
+MAX_PEOPLE_LIMIT = 10     # ✨ 新增：報名人數上限設定
 
 # 在這裡設定你的問卷問題：
 SURVEY_QUESTIONS = [
@@ -63,8 +63,8 @@ SURVEY_QUESTIONS = [
     }
 ]
 
-# 根據你的設定，自動產生預期的 CSV 欄位名稱
-EXPECTED_COLUMNS = ["時間戳記"] + [q["title"] for q in SURVEY_QUESTIONS]
+# ✨ 擴充預期欄位：加入「狀態」欄，用來在後台區分 正取/候補
+EXPECTED_COLUMNS = ["時間戳記", "狀態"] + [q["title"] for q in SURVEY_QUESTIONS]
 
 # ==========================================
 # 📦 2. 初始化與自動錯誤修復機制 
@@ -109,100 +109,116 @@ if os.path.exists(DATA_FILE):
         df_count = pd.read_csv(DATA_FILE, encoding="utf-8-sig")
         total_forms = len(df_count)
         
-        # 定義家眷選項對應的人數：自己一人->1人，帶1人->2人，帶2人->3人
+        # ✨ 修改：僅統計資料庫內「狀態為正取」的總人數，避免候補人數干擾計數
         q4_title = "👨‍👩‍👧‍👦 4. 是否攜帶家眷？"
-        if q4_title in df_count.columns:
-            for val in df_count[q4_title]:
+        if q4_title in df_count.columns and "狀態" in df_count.columns:
+            df_confirmed = df_count[df_count["狀態"] == "正取"]
+            for val in df_confirmed[q4_title]:
                 if val == "帶 1 人":
                     total_people += 2
                 elif val == "帶 2 人":
                     total_people += 3
                 else:
-                    total_people += 1  # 自己一人或未預期狀況預設 1 人
+                    total_people += 1  # 自己一人
         else:
             total_people = total_forms
     except Exception:
         total_forms = 0
         total_people = 0
 
-# 用漂亮的卡片元件顯示人數，並加上進度與上限標示
+# ✨ 判斷目前是否已達上限
+is_full = total_people >= MAX_PEOPLE_LIMIT
+
+# 用漂亮的卡片元件顯示人數
 col_metric1, col_metric2 = st.columns(2)
 with col_metric1:
     st.metric(label="🔥 目前累計填寫份數", value=f"{total_forms} 份")
 with col_metric2:
-    st.metric(label="👨‍👩‍👧‍👦 目前累計總人數 (含眷屬)", value=f"{total_people} / {MAX_PEOPLE_LIMIT} 人")
+    st.metric(label="👨‍👩‍👧‍👦 目前正取總人數 (含眷屬)", value=f"{total_people} / {MAX_PEOPLE_LIMIT} 人")
+
+# ✨ 新增：根據人數上限，即時在畫面上動態顯示對應提示
+if is_full:
+    st.error(f"🚨 報名已額滿，您目前登記為候補")
+else:
+    st.success(f"🍏 目前尚有空位（剩餘名額：{MAX_PEOPLE_LIMIT - total_people} 人），歡迎踴躍報名！")
 
 st.write("請花費一分鐘填寫以下內容，謝謝您的參與！")
 st.write("---")
 
-# 📢 新增：人數判定截止機制
-if total_people >= MAX_PEOPLE_LIMIT:
-    st.error("❌ 報名已額滿")
-    st.info(f"目前累計總人數已達 {total_people} 人（上限 {MAX_PEOPLE_LIMIT} 人），非常感謝大家的踴躍參與！後續若有釋出名額將再行通知。")
-else:
-    # 狀態：未額滿 -> 正常顯示問卷表單
-    user_responses = {}
+# 用來暫存使用者回答的字典
+user_responses = {}
 
-    with st.form(key="survey_form", clear_on_submit=True):
-        for q in SURVEY_QUESTIONS:
-            if q["type"] == "select":
-                user_responses[q["title"]] = st.selectbox(
-                    q["title"], 
-                    options=q["options"], 
-                    index=None, 
-                    placeholder="請選擇一個選項..."
-                )
-            elif q["type"] == "text":
-                user_responses[q["title"]] = st.text_input(
-                    q["title"], 
-                    placeholder=q.get("placeholder", "")
-                )
-            elif q["type"] == "radio":
-                user_responses[q["title"]] = st.radio(
-                    q["title"], 
-                    options=q["options"], 
-                    index=None
-                )
-            elif q["type"] == "textarea":
-                user_responses[q["title"]] = st.text_area(
-                    q["title"], 
-                    placeholder=q.get("placeholder", "")
-                )
+with st.form(key="survey_form", clear_on_submit=True):
+    for q in SURVEY_QUESTIONS:
+        if q["type"] == "select":
+            user_responses[q["title"]] = st.selectbox(
+                q["title"], 
+                options=q["options"], 
+                index=None, 
+                placeholder="請選擇一個選項..."
+            )
+        elif q["type"] == "text":
+            user_responses[q["title"]] = st.text_input(
+                q["title"], 
+                placeholder=q.get("placeholder", "")
+            )
+        elif q["type"] == "radio":
+            user_responses[q["title"]] = st.radio(
+                q["title"], 
+                options=q["options"], 
+                index=None
+            )
+        elif q["type"] == "textarea":
+            user_responses[q["title"]] = st.text_area(
+                q["title"], 
+                placeholder=q.get("placeholder", "")
+            )
+            
+    submit_button = st.form_submit_button(label="送出問卷", type="primary")
+
+if submit_button:
+    # 檢查必填項目
+    has_error = False
+    for q in SURVEY_QUESTIONS:
+        val = user_responses[q["title"]]
+        if q["required"]:
+            if val is None or (isinstance(val, str) and not val.strip()):
+                st.warning(f"⚠️ 請填寫/選擇「{q['title']}」")
+                has_error = True
+                break
                 
-        submit_button = st.form_submit_button(label="送出問卷", type="primary")
-
-    if submit_button:
-        # 檢查必填項目
-        has_error = False
+    if not has_error:
+        # 取得台灣時間 (台北時區)
+        if HAS_PYTZ:
+            tw_tz = pytz.timezone("Asia/Taipei")
+            tw_now = datetime.datetime.now(tw_tz)
+        else:
+            utc_now = datetime.datetime.now(datetime.timezone.utc)
+            tw_now = utc_now + datetime.timedelta(hours=8)
+            
+        # ✨ 新增：依據送出當下是否額滿，給予正取或候補狀態
+        current_status = "候補" if is_full else "正取"
+        
+        row_data = {
+            "時間戳記": tw_now.strftime("%Y-%m-%d %H:%M:%S"),
+            "狀態": current_status
+        }
+        
         for q in SURVEY_QUESTIONS:
             val = user_responses[q["title"]]
-            if q["required"]:
-                if val is None or (isinstance(val, str) and not val.strip()):
-                    st.warning(f"⚠️ 請填寫/選擇「{q['title']}」")
-                    has_error = True
-                    break
-                    
-        if not has_error:
-            # 取得台灣時間 (台北時區)
-            if HAS_PYTZ:
-                tw_tz = pytz.timezone("Asia/Taipei")
-                tw_now = datetime.datetime.now(tw_tz)
-            else:
-                # 防錯替代方案：手動計算 UTC+8 時間
-                utc_now = datetime.datetime.now(datetime.timezone.utc)
-                tw_now = utc_now + datetime.timedelta(hours=8)
-                
-            row_data = {"時間戳記": tw_now.strftime("%Y-%m-%d %H:%M:%S")}
+            row_data[q["title"]] = val.strip() if isinstance(val, str) else val
             
-            for q in SURVEY_QUESTIONS:
-                val = user_responses[q["title"]]
-                row_data[q["title"]] = val.strip() if isinstance(val, str) else val
-                
-            # 寫入 CSV
-            new_data = pd.DataFrame([row_data])
-            new_data.to_csv(DATA_FILE, mode="a", header=False, index=False, encoding="utf-8-sig")
-            st.success("🎉 問卷提交成功！感謝您的回答。")
-            st.rerun()  # 提交成功後立即重新整理，讓上方的人數即時更新！
+        # 寫入 CSV
+        new_data = pd.DataFrame([row_data])
+        new_data.to_csv(DATA_FILE, mode="a", header=False, index=False, encoding="utf-8-sig")
+        
+        # ✨ 新增：送出成功後的彈出視窗提示
+        if current_status == "候補":
+            st.info("👋 問卷提交成功！因目前名額已滿，系統已將您登記為【候補】。")
+        else:
+            st.success("🎉 問卷提交成功！您已成功取得【正取】名額。")
+            
+        st.rerun()  # 提交成功後立即重新整理
 
 
 # ==========================================
