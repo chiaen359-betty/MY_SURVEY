@@ -173,7 +173,9 @@ if submit_button:
                 
     if not has_error:
         # 整理整行資料
-        row_data = {"時間戳記": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")}
+        tw_tz = pytz.timezone("Asia/Taipei")
+        tw_now = datetime.datetime.now(tw_tz)
+        row_data = {"時間戳記": tw_now.strftime("%Y-%m-%d %H:%M:%S")}
         for q in SURVEY_QUESTIONS:
             val = user_responses[q["title"]]
             row_data[q["title"]] = val.strip() if isinstance(val, str) else val
