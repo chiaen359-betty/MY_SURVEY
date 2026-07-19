@@ -15,6 +15,7 @@ except ImportError:
 # ==========================================
 ADMIN_PASSWORD = "betty"  # 後台密碼
 DATA_FILE = "survey_results.csv"  # 存檔檔名
+MAX_PEOPLE_LIMIT = 10  # 🎯 報名人數上限設定 (達到此人數即截止)
 
 # 在這裡設定你的問卷問題：
 SURVEY_QUESTIONS = [
@@ -99,7 +100,7 @@ initialize_or_fix_csv()
 st.set_page_config(page_title="自訂問卷系統", layout="wide")
 st.title("📋 線上問卷調查")
 
-# --- 修改：計算目前填寫表單人數與總出席人數 ---
+# --- 計算目前填寫表單人數與總出席人數 ---
 total_forms = 0
 total_people = 0
 
@@ -124,79 +125,84 @@ if os.path.exists(DATA_FILE):
         total_forms = 0
         total_people = 0
 
-# 用漂亮的卡片元件顯示人數，並加上溫馨提示
+# 用漂亮的卡片元件顯示人數，並加上進度與上限標示
 col_metric1, col_metric2 = st.columns(2)
 with col_metric1:
     st.metric(label="🔥 目前累計填寫份數", value=f"{total_forms} 份")
 with col_metric2:
-    st.metric(label="👨‍👩‍👧‍👦 目前累計總人數 (含眷屬)", value=f"{total_people} 人")
+    st.metric(label="👨‍👩‍👧‍👦 目前累計總人數 (含眷屬)", value=f"{total_people} / {MAX_PEOPLE_LIMIT} 人")
 
 st.write("請花費一分鐘填寫以下內容，謝謝您的參與！")
 st.write("---")
 
-# 用來暫存使用者回答的字典
-user_responses = {}
+# 📢 新增：人數判定截止機制
+if total_people >= MAX_PEOPLE_LIMIT:
+    st.error("❌ 報名已額滿")
+    st.info(f"目前累計總人數已達 {total_people} 人（上限 {MAX_PEOPLE_LIMIT} 人），非常感謝大家的踴躍參與！後續若有釋出名額將再行通知。")
+else:
+    # 狀態：未額滿 -> 正常顯示問卷表單
+    user_responses = {}
 
-with st.form(key="survey_form", clear_on_submit=True):
-    for q in SURVEY_QUESTIONS:
-        if q["type"] == "select":
-            user_responses[q["title"]] = st.selectbox(
-                q["title"], 
-                options=q["options"], 
-                index=None, 
-                placeholder="請選擇一個選項..."
-            )
-        elif q["type"] == "text":
-            user_responses[q["title"]] = st.text_input(
-                q["title"], 
-                placeholder=q.get("placeholder", "")
-            )
-        elif q["type"] == "radio":
-            user_responses[q["title"]] = st.radio(
-                q["title"], 
-                options=q["options"], 
-                index=None
-            )
-        elif q["type"] == "textarea":
-            user_responses[q["title"]] = st.text_area(
-                q["title"], 
-                placeholder=q.get("placeholder", "")
-            )
-            
-    submit_button = st.form_submit_button(label="送出問卷", type="primary")
-
-if submit_button:
-    # 檢查必填項目
-    has_error = False
-    for q in SURVEY_QUESTIONS:
-        val = user_responses[q["title"]]
-        if q["required"]:
-            if val is None or (isinstance(val, str) and not val.strip()):
-                st.warning(f"⚠️ 請填寫/選擇「{q['title']}」")
-                has_error = True
-                break
+    with st.form(key="survey_form", clear_on_submit=True):
+        for q in SURVEY_QUESTIONS:
+            if q["type"] == "select":
+                user_responses[q["title"]] = st.selectbox(
+                    q["title"], 
+                    options=q["options"], 
+                    index=None, 
+                    placeholder="請選擇一個選項..."
+                )
+            elif q["type"] == "text":
+                user_responses[q["title"]] = st.text_input(
+                    q["title"], 
+                    placeholder=q.get("placeholder", "")
+                )
+            elif q["type"] == "radio":
+                user_responses[q["title"]] = st.radio(
+                    q["title"], 
+                    options=q["options"], 
+                    index=None
+                )
+            elif q["type"] == "textarea":
+                user_responses[q["title"]] = st.text_area(
+                    q["title"], 
+                    placeholder=q.get("placeholder", "")
+                )
                 
-    if not has_error:
-        # 取得台灣時間 (台北時區)
-        if HAS_PYTZ:
-            tw_tz = pytz.timezone("Asia/Taipei")
-            tw_now = datetime.datetime.now(tw_tz)
-        else:
-            # 防錯替代方案：手動計算 UTC+8 時間
-            utc_now = datetime.datetime.now(datetime.timezone.utc)
-            tw_now = utc_now + datetime.timedelta(hours=8)
-            
-        row_data = {"時間戳記": tw_now.strftime("%Y-%m-%d %H:%M:%S")}
-        
+        submit_button = st.form_submit_button(label="送出問卷", type="primary")
+
+    if submit_button:
+        # 檢查必填項目
+        has_error = False
         for q in SURVEY_QUESTIONS:
             val = user_responses[q["title"]]
-            row_data[q["title"]] = val.strip() if isinstance(val, str) else val
+            if q["required"]:
+                if val is None or (isinstance(val, str) and not val.strip()):
+                    st.warning(f"⚠️ 請填寫/選擇「{q['title']}」")
+                    has_error = True
+                    break
+                    
+        if not has_error:
+            # 取得台灣時間 (台北時區)
+            if HAS_PYTZ:
+                tw_tz = pytz.timezone("Asia/Taipei")
+                tw_now = datetime.datetime.now(tw_tz)
+            else:
+                # 防錯替代方案：手動計算 UTC+8 時間
+                utc_now = datetime.datetime.now(datetime.timezone.utc)
+                tw_now = utc_now + datetime.timedelta(hours=8)
+                
+            row_data = {"時間戳記": tw_now.strftime("%Y-%m-%d %H:%M:%S")}
             
-        # 寫入 CSV
-        new_data = pd.DataFrame([row_data])
-        new_data.to_csv(DATA_FILE, mode="a", header=False, index=False, encoding="utf-8-sig")
-        st.success("🎉 問卷提交成功！感謝您的回答。")
-        st.rerun()  # 提交成功後立即重新整理，讓上方的人數即時更新！
+            for q in SURVEY_QUESTIONS:
+                val = user_responses[q["title"]]
+                row_data[q["title"]] = val.strip() if isinstance(val, str) else val
+                
+            # 寫入 CSV
+            new_data = pd.DataFrame([row_data])
+            new_data.to_csv(DATA_FILE, mode="a", header=False, index=False, encoding="utf-8-sig")
+            st.success("🎉 問卷提交成功！感謝您的回答。")
+            st.rerun()  # 提交成功後立即重新整理，讓上方的人數即時更新！
 
 
 # ==========================================
