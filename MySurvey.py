@@ -83,7 +83,20 @@ initialize_or_fix_csv()
 # ==========================================
 st.set_page_config(page_title="自訂問卷系統", layout="wide")
 st.title("📋 線上問卷調查")
+
+# --- 新增：計算並顯示目前填寫人數 ---
+current_respondents = 0
+if os.path.exists(DATA_FILE):
+    try:
+        df_count = pd.read_csv(DATA_FILE, encoding="utf-8-sig")
+        current_respondents = len(df_count)
+    except Exception:
+        current_respondents = 0
+
+# 用漂亮的卡片元件顯示人數，並加上溫馨提示
+st.metric(label="🔥 目前累計填寫人數", value=f"{current_respondents} 人")
 st.write("請花費一分鐘填寫以下內容，謝謝您的參與！")
+st.write("---")
 
 # 用來暫存使用者回答的字典
 user_responses = {}
@@ -138,6 +151,7 @@ if submit_button:
         new_data = pd.DataFrame([row_data])
         new_data.to_csv(DATA_FILE, mode="a", header=False, index=False, encoding="utf-8-sig")
         st.success("🎉 問卷提交成功！感謝您的回答。")
+        st.rerun()  # 提交成功後立即重新整理，讓上方的人數即時更新！
 
 
 # ==========================================
