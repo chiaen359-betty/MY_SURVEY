@@ -39,6 +39,13 @@ SURVEY_QUESTIONS = [
         "required": True
     },
     {
+        "id": "family",
+        "title": "👨‍👩‍👧 請問您是否攜帶家眷？",
+        "type": "select",
+        "options": ["自己一人", "帶 1 人", "帶 2 人"],
+        "required": True
+    },
+    {
         "id": "q4",
         "title": "4. 其他意見？💬",
         "type": "textarea",
