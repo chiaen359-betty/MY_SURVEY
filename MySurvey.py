@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import datetime
+import json  # ✨ 新增：引入讀寫組態檔的套件
 
 # 嘗試引入時區套件，若環境未安裝則啟動自動修正機制
 try:
@@ -15,13 +16,37 @@ except ImportError:
 # ==========================================
 ADMIN_PASSWORD = "betty"  # 後台密碼
 DATA_FILE = "survey_results.csv"  # 存檔檔名
+CONFIG_FILE = "time_config.json"  # ✨ 新增：儲存時間設定的檔案
 MAX_PEOPLE_LIMIT = 10     # ✨ 新增：報名人數上限設定
 
-# ⏱️ ✨ 新增：初始化後台時間設定 (若 state 未初始化則設定預設值)
-if "start_time" not in st.session_state:
-    st.session_state.start_time = datetime.datetime(2026, 7, 19, 12, 40, 0)
-if "end_time" not in st.session_state:
-    st.session_state.end_time = datetime.datetime(2026, 7, 19, 12, 50, 0)
+# ✨ 新增：讀取與寫入時間設定的輔助函式
+def load_time_config():
+    default_config = {
+        "start_time": "2026-07-19 12:40:00",
+        "end_time": "2026-07-19 12:50:00"
+    }
+    if not os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_config, f, indent=4)
+        return default_config
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default_config
+
+def save_time_config(start_str, end_str):
+    config_data = {
+        "start_time": start_str,
+        "end_time": end_str
+    }
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(config_data, f, indent=4)
+
+# ⏱️ ✨ 從外部檔案動態載入時間設定
+time_config = load_time_config()
+START_TIME = datetime.datetime.strptime(time_config["start_time"], "%Y-%m-%d %H:%M:%S")
+END_TIME = datetime.datetime.strptime(time_config["end_time"], "%Y-%m-%d %H:%M:%S")
 
 # 在這裡設定你的問卷問題：
 SURVEY_QUESTIONS = [
@@ -102,8 +127,8 @@ else:
     tw_now_raw = utc_now + datetime.timedelta(hours=8)
     tw_now = tw_now_raw.replace(tzinfo=None)
 
-# ⏱️ ✨ 檢查是否在報名時間內 (由此處讀取 session_state 內的最新設定)
-is_registration_open = st.session_state.start_time <= tw_now <= st.session_state.end_time
+# ⏱️ ✨ 檢查是否在報名時間內
+is_registration_open = START_TIME <= tw_now <= END_TIME
 
 if not is_registration_open:
     # 🚫 ✨ 非報名期間顯示提示，且不渲染表單與人數統計
@@ -235,30 +260,6 @@ with st.expander("🛠️ 進入管理後台 (需管理員權限)", expanded=Fal
         st.success("🔓 密碼正確！已開啟管理權限。")
         st.write("---")
         
-        # ⏱️ ✨ 新增：管理後台 - 報名開放時間調整面板
-        st.subheader("⚙️ 0. 報名時間控制中心")
-        st.write(f"📢 目前設定報名區間為：`{st.session_state.start_time}` 至 `{st.session_state.end_time}`")
-        
-        col_start_date, col_start_time = st.columns(2)
-        with col_start_date:
-            start_date = st.date_input("開放日期", value=st.session_state.start_time.date())
-        with col_start_time:
-            start_time = st.time_input("開放時間", value=st.session_state.start_time.time())
-            
-        col_end_date, col_end_time = st.columns(2)
-        with col_end_date:
-            end_date = st.date_input("截止日期", value=st.session_state.end_time.date())
-        with col_end_time:
-            end_time = st.time_input("截止時間", value=st.session_state.end_time.time())
-            
-        if st.button("💾 儲存全新報名時間設定", type="primary"):
-            st.session_state.start_time = datetime.datetime.combine(start_date, start_time)
-            st.session_state.end_time = datetime.datetime.combine(end_date, end_time)
-            st.success("✅ 報名時間設定已成功更新！")
-            st.rerun()
-            
-        st.write("---")
-        
         # 讀取資料
         if os.path.exists(DATA_FILE):
             try:
@@ -310,6 +311,38 @@ with st.expander("🛠️ 進入管理後台 (需管理員權限)", expanded=Fal
                             st.caption(f"* **{opt}**：{val} 票 ({pct:.1f}%)")
             else:
                 st.write("目前設定的問卷中，沒有選項類的題目可供統計。")
+                
+            st.write("---")
+            
+            # --- ✨ 新增功能 4：問卷開放時間設定 (放在危險區域上方) ---
+            st.write("### ⏱️ 4. 問卷開放時間設定")
+            st.info(f"目前的設定為：\n* **開放報名**：{START_TIME.strftime('%Y-%m-%d %H:%M')}\n* **截止報名**：{END_TIME.strftime('%Y-%m-%d %H:%M')}")
+            
+            # 使用 Streamlit 表單讓管理員選取新的時間
+            with st.form(key="time_config_form"):
+                col_start_date, col_start_time = st.columns(2)
+                with col_start_date:
+                    new_start_date = st.date_input("新開放日期", value=START_TIME.date())
+                with col_start_time:
+                    new_start_time = st.time_input("新開放時間", value=START_TIME.time())
+                    
+                col_end_date, col_end_time = st.columns(2)
+                with col_end_date:
+                    new_end_date = st.date_input("新截止日期", value=END_TIME.date())
+                with col_end_time:
+                    new_end_time = st.time_input("新截止時間", value=END_TIME.time())
+                
+                submit_time_btn = st.form_submit_button("💾 儲存並更新時間設定", type="primary")
+                
+            if submit_time_btn:
+                # 組合日期與時間字串
+                start_datetime_str = f"{new_start_date} {new_start_time.strftime('%H:%M:%S')}"
+                end_datetime_str = f"{new_end_date} {new_end_time.strftime('%H:%M:%S')}"
+                
+                # 寫入外部 JSON 檔案
+                save_time_config(start_datetime_str, end_datetime_str)
+                st.success("🎉 開放與截止時間已成功更新並寫入檔案！")
+                st.rerun()
                 
             st.write("---")
             
