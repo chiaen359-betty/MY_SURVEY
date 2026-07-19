@@ -75,17 +75,17 @@ SURVEY_QUESTIONS = [
     },
     {
         "id": "q4",
-        "title": "4.您的建議？",
-        "type": "textarea",
-        "placeholder": "有任何想說的，請寫在這裡唷！",
-        "required": False
-    },
-    {
-        "id": "q5",
-        "title": "5.我同意報名費由薪資代扣",
+        "title": "4.我同意報名費由薪資代扣",
         "type": "radio",
         "options": ["同意"],
         "required": True
+    },
+    {
+        "id": "q5",
+        "title": "5.您的建議？",
+        "type": "textarea",
+        "placeholder": "有任何想說的，請寫在這裡唷！",
+        "required": False
     }
 ]
 
@@ -192,30 +192,40 @@ else:
     # 用來暫存使用者回答的字典
     user_responses = {}
 
-    with st.form(key="survey_form", clear_on_submit=True):
+    # 僅在成功提交後清空表單；驗證失敗時保留使用者已填寫的內容。
+    if st.session_state.pop("clear_survey_form", False):
         for q in SURVEY_QUESTIONS:
+            st.session_state.pop(f"survey_answer_{q['id']}", None)
+
+    with st.form(key="survey_form", clear_on_submit=False):
+        for q in SURVEY_QUESTIONS:
+            widget_key = f"survey_answer_{q['id']}"
             if q["type"] == "select":
                 user_responses[q["title"]] = st.selectbox(
                     q["title"], 
                     options=q["options"], 
                     index=None, 
-                    placeholder="請選擇一個選項..."
+                    placeholder="請選擇一個選項...",
+                    key=widget_key
                 )
             elif q["type"] == "text":
                 user_responses[q["title"]] = st.text_input(
                     q["title"], 
-                    placeholder=q.get("placeholder", "")
+                    placeholder=q.get("placeholder", ""),
+                    key=widget_key
                 )
             elif q["type"] == "radio":
                 user_responses[q["title"]] = st.radio(
                     q["title"], 
                     options=q["options"], 
-                    index=None
+                    index=q.get("default_index"),
+                    key=widget_key
                 )
             elif q["type"] == "textarea":
                 user_responses[q["title"]] = st.text_area(
                     q["title"], 
-                    placeholder=q.get("placeholder", "")
+                    placeholder=q.get("placeholder", ""),
+                    key=widget_key
                 )
                 
         submit_button = st.form_submit_button(label="送出問卷", type="primary")
@@ -247,6 +257,9 @@ else:
             # 寫入 CSV
             new_data = pd.DataFrame([row_data])
             new_data.to_csv(DATA_FILE, mode="a", header=False, index=False, encoding="utf-8-sig")
+
+            # 下一次重新整理時才清空，避免在驗證失敗時遺失輸入內容。
+            st.session_state["clear_survey_form"] = True
             
             if current_status == "候補":
                 st.info("👋 問卷提交成功！因目前名額已滿，系統已將您登記為【候補】。")
