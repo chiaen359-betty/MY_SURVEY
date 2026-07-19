@@ -79,6 +79,13 @@ SURVEY_QUESTIONS = [
         "type": "textarea",
         "placeholder": "有任何想說的，請寫在這裡唷！",
         "required": False
+    },
+    {
+        "id": "q5",
+        "title": "5.我同意報名費由薪資代扣",
+        "type": "radio",
+        "options": ["同意"],
+        "required": True
     }
 ]
 
