@@ -1,6 +1,14 @@
 import streamlit as st
 import pandas as pd
 import os
+import datetime
+
+# 嘗試引入時區套件，若環境未安裝則啟動自動修正機制
+try:
+    import pytz
+    HAS_PYTZ = True
+except ImportError:
+    HAS_PYTZ = False
 
 # ==========================================
 # 🛠️ 1. 萬用自訂設定區 (以後你只要改這裡就好)
@@ -100,10 +108,7 @@ if os.path.exists(DATA_FILE):
         df_count = pd.read_csv(DATA_FILE, encoding="utf-8-sig")
         total_forms = len(df_count)
         
-        # 定義家眷選項對應的人數
-        # "自己一人" -> 1人
-        # "帶 1 人" -> 2人
-        # "帶 2 人" -> 3人
+        # 定義家眷選項對應的人數：自己一人->1人，帶1人->2人，帶2人->3人
         q4_title = "👨‍👩‍👧‍👦 4. 是否攜帶家眷？"
         if q4_title in df_count.columns:
             for val in df_count[q4_title]:
@@ -172,10 +177,17 @@ if submit_button:
                 break
                 
     if not has_error:
-        # 整理整行資料
-        tw_tz = pytz.timezone("Asia/Taipei")
-        tw_now = datetime.datetime.now(tw_tz)
+        # 取得台灣時間 (台北時區)
+        if HAS_PYTZ:
+            tw_tz = pytz.timezone("Asia/Taipei")
+            tw_now = datetime.datetime.now(tw_tz)
+        else:
+            # 防錯替代方案：手動計算 UTC+8 時間
+            utc_now = datetime.datetime.now(datetime.timezone.utc)
+            tw_now = utc_now + datetime.timedelta(hours=8)
+            
         row_data = {"時間戳記": tw_now.strftime("%Y-%m-%d %H:%M:%S")}
+        
         for q in SURVEY_QUESTIONS:
             val = user_responses[q["title"]]
             row_data[q["title"]] = val.strip() if isinstance(val, str) else val
