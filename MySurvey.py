@@ -20,7 +20,7 @@ SURVEY_QUESTIONS = [
     {
         "id": "q1",
         "title": "1. 你喜歡什麼顏色？🌈",
-        "type": "select",
+        "type": "radio",
         "options": ["紅", "橙", "黃", "綠", "藍", "靛", "紫"],
         "required": True
     },
