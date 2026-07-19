@@ -30,7 +30,7 @@ SURVEY_QUESTIONS = [
         "id": "q2",
         "title": "2.您的工號？",
         "type": "text",
-        "options": "例如：01234",
+        "placeholder": "例如：01234",
         "required": True
     },
     {
