@@ -39,15 +39,15 @@ SURVEY_QUESTIONS = [
         "required": True
     },
     {
-        "id": "family",
-        "title": "👨‍👩‍👧 請問您是否攜帶家眷？",
-        "type": "select",
+        "id": "q4",
+        "title": "👨‍👩‍👧‍👦 4. 是否攜帶家眷？",
+        "type": "radio",
         "options": ["自己一人", "帶 1 人", "帶 2 人"],
         "required": True
     },
     {
-        "id": "q4",
-        "title": "4. 其他意見？💬",
+        "id": "q5",
+        "title": "5. 其他意見？💬",
         "type": "textarea",
         "placeholder": "有任何想說的，或者是想扭到什麼扭蛋，都可以寫在這裡唷！",
         "required": False
@@ -91,17 +91,41 @@ initialize_or_fix_csv()
 st.set_page_config(page_title="自訂問卷系統", layout="wide")
 st.title("📋 線上問卷調查")
 
-# --- 新增：計算並顯示目前填寫人數 ---
-current_respondents = 0
+# --- 修改：計算目前填寫表單人數與總出席人數 ---
+total_forms = 0
+total_people = 0
+
 if os.path.exists(DATA_FILE):
     try:
         df_count = pd.read_csv(DATA_FILE, encoding="utf-8-sig")
-        current_respondents = len(df_count)
+        total_forms = len(df_count)
+        
+        # 定義家眷選項對應的人數
+        # "自己一人" -> 1人
+        # "帶 1 人" -> 2人
+        # "帶 2 人" -> 3人
+        q4_title = "👨‍👩‍👧‍👦 4. 是否攜帶家眷？"
+        if q4_title in df_count.columns:
+            for val in df_count[q4_title]:
+                if val == "帶 1 人":
+                    total_people += 2
+                elif val == "帶 2 人":
+                    total_people += 3
+                else:
+                    total_people += 1  # 自己一人或未預期狀況預設 1 人
+        else:
+            total_people = total_forms
     except Exception:
-        current_respondents = 0
+        total_forms = 0
+        total_people = 0
 
 # 用漂亮的卡片元件顯示人數，並加上溫馨提示
-st.metric(label="🔥 目前累計填寫人數", value=f"{current_respondents} 人")
+col_metric1, col_metric2 = st.columns(2)
+with col_metric1:
+    st.metric(label="🔥 目前累計填寫份數", value=f"{total_forms} 份")
+with col_metric2:
+    st.metric(label="👨‍👩‍👧‍👦 目前累計總人數 (含眷屬)", value=f"{total_people} 人")
+
 st.write("請花費一分鐘填寫以下內容，謝謝您的參與！")
 st.write("---")
 
@@ -190,7 +214,7 @@ with st.expander("🛠️ 進入管理後台 (需管理員權限)", expanded=Fal
             
             # --- 功能 1：顯示每個人的選擇 ---
             st.write("### 📝 1. 原始問卷填寫明細")
-            st.write(f"目前累計填寫人數：**{len(df)}** 人")
+            st.write(f"目前累計填寫份數：**{len(df)}** 份")
             st.dataframe(df, use_container_width=True)
             
             csv_data = df.to_csv(index=False, encoding="utf-8-sig")
