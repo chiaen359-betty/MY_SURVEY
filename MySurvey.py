@@ -17,9 +17,11 @@ ADMIN_PASSWORD = "betty"  # 後台密碼
 DATA_FILE = "survey_results.csv"  # 存檔檔名
 MAX_PEOPLE_LIMIT = 10     # ✨ 新增：報名人數上限設定
 
-# ⏱️ ✨ 新增：開放與截止時間設定 (不帶時區的標準時間格式)
-START_TIME = datetime.datetime(2026, 7, 19, 12, 40, 0)
-END_TIME = datetime.datetime(2026, 7, 19, 12, 50, 0)
+# ⏱️ ✨ 新增：初始化後台時間設定 (若 state 未初始化則設定預設值)
+if "start_time" not in st.session_state:
+    st.session_state.start_time = datetime.datetime(2026, 7, 19, 12, 40, 0)
+if "end_time" not in st.session_state:
+    st.session_state.end_time = datetime.datetime(2026, 7, 19, 12, 50, 0)
 
 # 在這裡設定你的問卷問題：
 SURVEY_QUESTIONS = [
@@ -100,8 +102,8 @@ else:
     tw_now_raw = utc_now + datetime.timedelta(hours=8)
     tw_now = tw_now_raw.replace(tzinfo=None)
 
-# ⏱️ ✨ 檢查是否在報名時間內
-is_registration_open = START_TIME <= tw_now <= END_TIME
+# ⏱️ ✨ 檢查是否在報名時間內 (由此處讀取 session_state 內的最新設定)
+is_registration_open = st.session_state.start_time <= tw_now <= st.session_state.end_time
 
 if not is_registration_open:
     # 🚫 ✨ 非報名期間顯示提示，且不渲染表單與人數統計
@@ -231,6 +233,30 @@ with st.expander("🛠️ 進入管理後台 (需管理員權限)", expanded=Fal
     
     if password == ADMIN_PASSWORD:
         st.success("🔓 密碼正確！已開啟管理權限。")
+        st.write("---")
+        
+        # ⏱️ ✨ 新增：管理後台 - 報名開放時間調整面板
+        st.subheader("⚙️ 0. 報名時間控制中心")
+        st.write(f"📢 目前設定報名區間為：`{st.session_state.start_time}` 至 `{st.session_state.end_time}`")
+        
+        col_start_date, col_start_time = st.columns(2)
+        with col_start_date:
+            start_date = st.date_input("開放日期", value=st.session_state.start_time.date())
+        with col_start_time:
+            start_time = st.time_input("開放時間", value=st.session_state.start_time.time())
+            
+        col_end_date, col_end_time = st.columns(2)
+        with col_end_date:
+            end_date = st.date_input("截止日期", value=st.session_state.end_time.date())
+        with col_end_time:
+            end_time = st.time_input("截止時間", value=st.session_state.end_time.time())
+            
+        if st.button("💾 儲存全新報名時間設定", type="primary"):
+            st.session_state.start_time = datetime.datetime.combine(start_date, start_time)
+            st.session_state.end_time = datetime.datetime.combine(end_date, end_time)
+            st.success("✅ 報名時間設定已成功更新！")
+            st.rerun()
+            
         st.write("---")
         
         # 讀取資料
