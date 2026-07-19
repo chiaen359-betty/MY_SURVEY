@@ -17,7 +17,7 @@ ADMIN_PASSWORD = "betty"  # 後台密碼
 DATA_FILE = "survey_results.csv"  # 存檔檔名
 MAX_PEOPLE_LIMIT = 10     # ✨ 新增：報名人數上限設定
 
-# ⏱️ ✨ 新增：開放與截止時間設定 (台北時區)
+# ⏱️ ✨ 新增：開放與截止時間設定 (不帶時區的標準時間格式)
 START_TIME = datetime.datetime(2026, 7, 19, 12, 40, 0)
 END_TIME = datetime.datetime(2026, 7, 19, 12, 50, 0)
 
@@ -90,15 +90,15 @@ initialize_or_fix_csv()
 st.set_page_config(page_title="自訂問卷系統", layout="wide")
 st.title("📋 線上問卷調查")
 
-# ⏱️ ✨ 取得目前台灣時間 (台北時區) 以便進行報名期間判斷
+# ⏱️ ✨ 取得目前台灣時間 (台北時區) 並強制移除時區資訊以防比對出錯
 if HAS_PYTZ:
     tw_tz = pytz.timezone("Asia/Taipei")
     tw_now_raw = datetime.datetime.now(tw_tz)
-    # 將有時區資訊的 datetime 轉為 naive datetime 方便與設定時間比較
-    tw_now = datetime.datetime(tw_now_raw.year, tw_now_raw.month, tw_now_raw.day, tw_now_raw.hour, tw_now_raw.minute, tw_now_raw.second)
+    tw_now = tw_now_raw.replace(tzinfo=None)
 else:
     utc_now = datetime.datetime.now(datetime.timezone.utc)
-    tw_now = utc_now + datetime.timedelta(hours=8)
+    tw_now_raw = utc_now + datetime.timedelta(hours=8)
+    tw_now = tw_now_raw.replace(tzinfo=None)
 
 # ⏱️ ✨ 檢查是否在報名時間內
 is_registration_open = START_TIME <= tw_now <= END_TIME
@@ -288,7 +288,7 @@ with st.expander("🛠️ 進入管理後台 (需管理員權限)", expanded=Fal
             st.write("---")
             
             # --- 功能 3：刪除全部結果 ---
-            st.write("### 🚨 3.危險區域")
+            st.write("### 🚨 3. 危險區域")
             st.write("此動作將會清除所有已儲存的問卷回答，且**無法復原**。")
             
             confirm_delete = st.checkbox("我確定要刪除所有問卷填寫結果。")
