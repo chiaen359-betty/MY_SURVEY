@@ -20,45 +20,31 @@ MAX_PEOPLE_LIMIT = 10     # ✨ 新增：報名人數上限設定
 # 在這裡設定你的問卷問題：
 SURVEY_QUESTIONS = [
     {
-        "id": "name",
-        "title": "👤 請填入你是誰？",
-        "type": "text",
-        "placeholder": "請輸入您的名字或暱稱...",
-        "required": True
-    },
-    {
         "id": "q1",
-        "title": "1. 你喜歡什麼顏色？🌈",
-        "type": "radio",
-        "options": ["紅", "橙", "黃", "綠", "藍", "靛", "紫"],
+        "title": "1.請問您的中文全名？",
+        "type": "text",
+        "placeholder": "例如：王小明",
         "required": True
     },
     {
         "id": "q2",
-        "title": "2. 你喜歡什麼寵物？🐶🐱",
-        "type": "text",
-        "placeholder": "例如：貓咪、水豚、金吉拉...",
+        "title": "2.您的工號？",
+        "type": "radio",
+        "options": "例如：01234",
         "required": True
     },
     {
         "id": "q3",
-        "title": "3. 明天要一起吃藏壽司嗎？🍣",
+        "title": "3.是否攜帶眷屬？",
         "type": "radio",
-        "options": ["Yes", "No"],
+        "options": ["無攜帶(FREE)", "攜帶1人(報名費100元)", "攜帶2人(報名費200元)"],
         "required": True
     },
     {
         "id": "q4",
-        "title": "👨‍👩‍👧‍👦 4. 是否攜帶家眷？",
-        "type": "radio",
-        "options": ["自己一人", "帶 1 人", "帶 2 人"],
-        "required": True
-    },
-    {
-        "id": "q5",
-        "title": "5. 其他意見？💬",
+        "title": "4.您的建議？",
         "type": "textarea",
-        "placeholder": "有任何想說的，或者是想扭到什麼扭蛋，都可以寫在這裡唷！",
+        "placeholder": "有任何想說的，請寫在這裡唷！",
         "required": False
     }
 ]
